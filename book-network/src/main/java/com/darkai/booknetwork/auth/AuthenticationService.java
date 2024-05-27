@@ -1,11 +1,15 @@
 package com.darkai.booknetwork.auth;
 
+import com.darkai.booknetwork.email.EmailService;
+import com.darkai.booknetwork.email.EmailTemplateName;
 import com.darkai.booknetwork.role.RoleRepository;
 import com.darkai.booknetwork.user.Token;
 import com.darkai.booknetwork.user.TokenRepository;
 import com.darkai.booknetwork.user.User;
 import com.darkai.booknetwork.user.UserRepository;
+import jakarta.mail.MessagingException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import java.security.SecureRandom;
@@ -20,8 +24,12 @@ public class AuthenticationService {
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
     private final TokenRepository tokenRepository;
+    private final EmailService emailService;
 
-    public void register(RegistrationRequest request) {
+    @Value("${application.mailing.frontend.activation-url}")
+    private String activationUrl;
+
+    public void register(RegistrationRequest request) throws MessagingException {
         var userRole = roleRepository.findByName("USER")
                 // TODO Better Exception Handling !
                 .orElseThrow(() -> new IllegalStateException("Role USER was not initialized !"));
@@ -51,17 +59,18 @@ public class AuthenticationService {
         return generatedToken;
     }
 
-    private void sendValidationEmail(User user) {
+    private void sendValidationEmail(User user) throws MessagingException {
         var newToken = generateAndSaveActivationToken(user);
 
-//        emailService.sendEmail(
-//                user.getEmail(),
-//                user.getFullName(),
-//                EmailTemplateName.ACTIVATE_ACCOUNT,
-//                activationUrl,
-//                newToken,
-//                "Account activation"
-//        );
+        // Send Email
+        emailService.sendEmail(
+                user.getEmail(),
+                user.fullName(),
+                EmailTemplateName.ACTIVATE_ACCOUNT,
+                activationUrl,
+                newToken,
+                "Account activation"
+        );
     }
 
     private String generateActivationCode(int length) {
